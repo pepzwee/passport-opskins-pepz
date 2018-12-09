@@ -2,6 +2,7 @@ const request = require('request')
 const crypto = require('crypto')
 const url = require('url')
 const qs = require('querystring')
+const fs = require('fs')
 
 const isJSON = json => {
   try {
@@ -118,25 +119,26 @@ const Strategy = function (options = {}, callback = Function()) {
   }
 
   this.refreshClients = () => {
-    this.getClients()
-      .then(clients => {
-        clients.forEach(client => {
-          if (client.name === this.siteName || client.redurect_uri === this.returnURL) {
-            this.deleteClient(client.client_id)
-          }
+    // check if client id file exists
+    if (fs.existsSync('./opskins.json')) {
+      const client = JSON.parse(fs.readFileSync('./opskins.json'))
+      // set client values
+      this.setClientValues(client.client_id, client.secret)
+    } else {
+      this.createClient()
+        .then(data => {
+          // set client values
+          this.setClientValues(data.client.client_id, data.secret)
+          // write client to file
+          fs.writeFileSync('./opskins.json', JSON.stringify({
+            client_id: data.client.client_id,
+            secret: data.secret
+          }))
         })
-
-        this.createClient()
-          .then(data => {
-            this.setClientValues(data.client.client_id, data.secret)
-          })
-          .catch(err => {
-            console.error(err)
-          })
-      })
-      .catch(err => {
-        console.error(err)
-      })
+        .catch(err => {
+          console.error(err)
+        })
+    }
   }
   // Call this on init
   this.refreshClients()
