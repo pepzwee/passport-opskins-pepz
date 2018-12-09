@@ -213,7 +213,7 @@ const Strategy = function (options = {}, callback = Function()) {
             `Error with authentication: ${json.error}`,
             `client_id: ${this.clientID}`,
             `client_secret: ${this.clientSecret}`,
-            `code: ${query.code}`
+            `query: ${JSON.stringify(query)}`
           )
           return reject(`Error with authentication: ${json.error}`)
         }
