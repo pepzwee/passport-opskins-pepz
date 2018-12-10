@@ -118,30 +118,46 @@ const Strategy = function (options = {}, callback = Function()) {
     })
   }
 
-  this.refreshClients = () => {
-    // check if client id file exists
-    if (fs.existsSync('./opskins.json')) {
-      const client = JSON.parse(fs.readFileSync('./opskins.json'))
-      // set client values
-      this.setClientValues(client.client_id, client.secret)
-    } else {
-      this.createClient()
-        .then(data => {
-          // set client values
-          this.setClientValues(data.client.client_id, data.secret)
-          // write client to file
-          fs.writeFileSync('./opskins.json', JSON.stringify({
-            client_id: data.client.client_id,
-            secret: data.secret
-          }))
-        })
-        .catch(err => {
-          console.error(err)
-        })
-    }
+  // this is a callback function cause I can't be arsed to
+  // catch any errors
+  this.loadClient = (callback = Function()) => {
+    // Load all clients that have been created
+    this.getClients()
+      .then(clients => {
+        // check if client id file exists
+        if (fs.existsSync('./opskins.json')) {
+          const client = JSON.parse(fs.readFileSync('./opskins.json'))
+          // check if client exists on opskins
+          const exists = clients.find(x => x.client_id === client.client_id)
+          // set client values if it's present on opskins
+          if (exists) {
+            this.setClientValues(client.client_id, client.secret)
+            // cb
+            return callback()
+          }
+        }
+        // either the file with client id doesn't exist or it's missing on opskins
+        this.createClient()
+          .then(data => {
+            // set client values
+            this.setClientValues(data.client.client_id, data.secret)
+            // write client to file
+            fs.writeFileSync('./opskins.json', JSON.stringify({
+              client_id: data.client.client_id,
+              secret: data.secret
+            }))
+            // cb
+            return callback()
+          })
+          .catch(err => {
+            console.error(err)
+            // cb
+            return callback(err)
+          })
+      })
   }
-  // Call this on init
-  this.refreshClients()
+  // Load client on init
+  this.loadClient()
 
   this.setStates = states => {
     this.states = states
@@ -181,7 +197,10 @@ const Strategy = function (options = {}, callback = Function()) {
         const json = isJSON(body)
         if (!json) return reject(`Invalid JSON response while trying to get user profile.`)
 
-        if (json.error) return reject(`Error while trying to get user profile: ${json.error}`)
+        if (json.error) {
+          console.error(`Error while trying to get user profile: ${json.error}`)
+          return reject(json.error)
+        }
 
         resolve(json)
       })
@@ -217,7 +236,7 @@ const Strategy = function (options = {}, callback = Function()) {
             `client_secret: ${this.clientSecret}`,
             `query: ${JSON.stringify(query)}`
           )
-          return reject(`Error with authentication: ${json.error}`)
+          return reject(json.error)
         }
   
         resolve(json)
@@ -295,7 +314,7 @@ const Strategy = function (options = {}, callback = Function()) {
             `client_secret: ${this.clientSecret}`,
             `code: ${query.code}`
           )
-          return reject(`Error with refresh token request: ${json.error}`)
+          return reject(json.error)
         }
 
         resolve(json.access_token)
